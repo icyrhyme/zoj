@@ -1,99 +1,144 @@
 #include <cstdio>
-#include <set>
-#include <vector>
-#include <map>
 #include <cstring>
+#include <map>
 #define MAXN 9
+#define UNSET(a,i) ((a)&(~(1<<(i))))
 using namespace std;
-struct delete_move {
-	int i, j;
-	char c;
-	delete_move() {}
-	delete_move(int i, int j, int c) {
-		this->i = i;
-		this->j = j;
-		this->c = c;
-	}
-};
-bool gao(set<char> board[][MAXN], bool done[][MAXN]) {
-	pair<int, int> opt;
-	int min_choices = 10, max_choices = 1;
-	for(int i = 0; i < MAXN; ++i)
-		for(int j = 0; j < MAXN; ++j) {
-			if(!done[i][j] && board[i][j].size() < min_choices) {
-				opt = make_pair(i, j);
-				min_choices = board[i][j].size();
+class Board {
+	short data[MAXN][MAXN];
+	bool done[MAXN][MAXN];
+public:
+	void _init() {
+		for(int i = 0; i < MAXN; ++i)
+			for(int j = 0; j < MAXN; ++j) {
+				data[i][j] = (1 << MAXN) - 1;
+				done[i][j] = false;
 			}
-			max_choices = max(max_choices, (int)board[i][j].size());
-
-		}
-	if(max_choices == 1) {
-		for(int i = 0; i < MAXN; ++i) {
+	}
+	Board() {
+		_init();
+	}
+	Board(const Board& that) {
+		for(int i = 0; i < MAXN; ++i)
+			for(int j = 0; j < MAXN; ++j) {
+				data[i][j] = that.data[i][j];
+				done[i][j] = that.done[i][j];
+			}
+	}
+	Board(char str[][MAXN + 1]) {
+		_init();
+		for(int i = 0; i < MAXN; ++i)
 			for(int j = 0; j < MAXN; ++j)
-				putchar(*board[i][j].begin());
-			putchar('\n');
-		}
+				if(str[i][j] != '0')
+					set(i, j, str[i][j] - '0');
+	}
+	void set(int i, int j, int n) {
+		--n;
+		data[i][j] = 1 << n;
+		done[i][j] = true;
+		for(int k = 0; k < MAXN; ++k) 
+			if(k != j)
+				data[i][k] = UNSET(data[i][k], n);
+		for(int k = 0; k < MAXN; ++k)
+			if(k != i)
+				data[k][j] = UNSET(data[k][j], n);
+		int br = i / 3 * 3, bc = j / 3 * 3;
+		for(int k = 0; k < 3; ++k)
+			for(int l = 0; l < 3; ++l)
+				if(br + k != i || bc + l != j)
+					data[br + k][bc + l] = UNSET(data[br + k][bc + l], n);
+	}
+	pair<int, int> getMostCertainPosition() {
+		pair<int, int> ret(-1, -1);
+		int m = 10;
+		for(int i = 0; i < MAXN; ++i)
+			for(int j = 0; j < MAXN; ++j) {
+				int cur = __builtin_popcount(data[i][j]);
+				if(!done[i][j] && cur < m) {
+					m = cur;
+					ret = make_pair(i, j);
+				}
+			}
+		return ret;
+	}
+	bool isDone() {
+		for(int i = 0; i < MAXN; ++i)
+			for(int j = 0; j < MAXN; ++j)
+				if(!done[i][j])
+					return false;
 		return true;
 	}
-	int i = opt.first, j = opt.second;
-	vector<char> choices(board[i][j].begin(), board[i][j].end());
-	for(vector<char>::iterator it = choices.begin(); it != choices.end(); ++it) {
-		vector<delete_move> records;
-		for(int k = '0'; k <= '9'; ++k) {
-			if(board[i][j].find(k) != board[i][j].end() && k != *it) {
-				board[i][j].erase(k);
-				delete_move temp(i, j, k);
-				records.push_back(temp);
-			}
-		}
-		for(int k = 0; k < MAXN; ++k) {
-			if(board[i][k].find(*it) != board[i][k].end() && k != j) {
-				board[i][k].erase(*it);
-				delete_move temp(i, k, *it);
-				records.push_back(temp);
-			}
-			if(board[k][j].find(*it) != board[k][j].end() && k != i) {
-				board[k][j].erase(*it);
-				delete_move temp(k, j, *it);
-				records.push_back(temp);
-			}
-		}
-		int br = i / 3, bc = j / 3;
-		for(int k = 0; k < 3; ++k)
-			for(int l = 0; l < 3; ++l) 
-				if(board[br + k][br + l].find(*it) != board[br + k][br + l].end() && (br + k != i || bc + l != j)) {
-					board[br + k][br + l].erase(*it);
-					delete_move temp(br + k, br + l, *it);
-					records.push_back(temp);
+	int getOptions(int i, int j) {
+		return data[i][j];
+	}
+	void print() {
+		for(int i = 0; i < MAXN; ++i) {
+			for(int j = 0; j < MAXN; ++j) {
+				int cnt = 0;
+				for(int k = 0; k < MAXN; ++k) {
+					if(data[i][j] & (1 << k)) {
+						putchar('1' + k);
+						++cnt;
+					}
 				}
-		done[i][j] = true;
-		if(gao(board, done))
-			return true;
-		done[i][j] = false;
-		for(vector<delete_move>::iterator rit = records.begin(); rit != records.end(); ++rit) {
-			board[rit->i][rit->j].insert(rit->c);
+				for(int k = 0; k < 9 - cnt; ++k)
+					putchar(' ');
+				if(j % 3 == 2 && j != MAXN - 1)
+					putchar('|');
+			}
+			putchar('\n');
+			if(i % 3 == 2 && i != MAXN - 1) {
+				for(int k = 0; k < MAXN * 9 + 2; ++k)
+					putchar('-');
+				putchar('\n');
+			}
+		}
+		putchar('\n');
+	}
+	void output() {
+		for(int i = 0; i < MAXN; ++i) {
+			for(int j = 0; j < MAXN; ++j) {
+				for(int k = 0; k < MAXN; ++k) {
+					if(data[i][j] & (1 << k)) {
+						putchar('1' + k);
+						break;
+					}
+				}
+			}
+			putchar('\n');
 		}
 	}
+};
+Board* solve(Board b) {
+	//b.print();
+	if(b.isDone())
+		return (new Board(b));
+	pair<int, int> p = b.getMostCertainPosition();
+	if(p.first == -1)
+		return NULL;
+	int ops = b.getOptions(p.first, p.second);
+	for(int k = 1; k <= MAXN; ++k) {
+		if(ops & (1 << (k - 1))) {
+			Board nb(b);
+			nb.set(p.first, p.second, k);
+			Board* ret = solve(nb);
+			if(ret != NULL)
+				return ret;
+		}
+	}
+	return NULL;
 }
 int main() {
 	int cs;
-	char sudoku[MAXN][MAXN + 1];
-	set<char> board[MAXN][MAXN];
-	bool done[MAXN][MAXN];
+	char str[MAXN][MAXN + 1];
 	scanf("%d", &cs);
 	while(cs--) {
 		for(int i = 0; i < MAXN; ++i)
-			scanf("%s", sudoku[i]);
-		for(int i = 0; i < MAXN; ++i)
-			for(int j = 0; j < MAXN; ++j) {
-				if(sudoku[i][j] == '0')
-					for(char k = '0'; k <= '9'; ++k)
-						board[i][j].insert(k);
-				else
-					board[i][j].insert(sudoku[i][j]);
-			}
-		memset(done, false, sizeof(done));
-		gao(board, done);
+			scanf("%s", str[i]);
+		Board b(str);
+		Board* sol = solve(b);
+		if(sol != NULL)
+			sol->output();
 	}
 	return 0;
 }
